@@ -58,3 +58,5 @@ b = param_reg(A, c, l)
 print "Linear regression, l = %f" % l
 print "RMSE for training %f" % lib.rmse(predict(trStats["movies"], trStats["users"], rBar, b), trStats["ratings"])
 print "RMSE for validation %f" % lib.rmse(predict(vlStats["movies"], vlStats["users"], rBar, b), vlStats["ratings"])
+
+#hi
