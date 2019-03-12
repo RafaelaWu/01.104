@@ -1,5 +1,6 @@
 import numpy as np
 import projectLib as lib
+import copy
 
 # shape is movie,user,rating
 training = lib.getTrainingData()
@@ -13,13 +14,17 @@ rBar = np.mean(trStats["ratings"])
 # we get the A matrix from the training dataset
 def getA(training):
     A = np.zeros((trStats["n_ratings"], trStats["n_movies"] + trStats["n_users"]))
-    # ???
+    for i in range(trStats["n_ratings"]):
+        A[i][training[i][0]] = 1
+        A[i][training[i][1]] = 1
     return A
 
 # we also get c
 def getc(rBar, ratings):
-    # ???
-    return None
+    rate = copy.deepcopy(ratings)
+    for i in range(len(ratings)):      
+        rate[i] = rate[i] - rBar
+    return rate
 
 # apply the functions
 A = getA(training)
@@ -27,15 +32,25 @@ c = getc(rBar, trStats["ratings"])
 
 # compute the estimator b
 def param(A, c):
-    # ???
-    return None
+    AT = np.transpose(A)
+    ATA = np.matmul(AT,A)
+    inverse = np.linalg.inv(ATA)
+    ATc = np.matmul(AT,c)
+    b = np.matmul(inverse,ATc)
+    return b
 
 # compute the estimator b with a regularisation parameter l
 # note: lambda is a Python keyword to define inline functions
 #       so avoid using it as a variable name!
 def param_reg(A, c, l):
-    # ???
-    return None
+    I = np.identity(trStats["n_movies"] + trStats["n_users"],dtype=None)
+    AT = np.transpose(A)
+    ATA = np.matmul(AT,A)
+    lI = l*I
+    inverse = np.linalg.inv(ATA+lI)    
+    ATc = np.matmul(AT,c)
+    b = np.matmul(inverse,ATc)
+    return b    
 
 # from b predict the ratings for the (movies, users) pair
 def predict(movies, users, rBar, b):
