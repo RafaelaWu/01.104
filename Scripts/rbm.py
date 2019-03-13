@@ -64,7 +64,10 @@ def hiddenToVisible(h, w):
     #   has not rated! (where reconstructing means getting a distribution
     #   over possible ratings).
     #   We only do so when we predict the rating a user would have given to a movie.
-    output=w[:,0,:]*h[0]+w[:,1,:]*h[1]+w[:,2,:]*h[2]+w[:,3,:]*h[3]+w[:,4,:]*h[4]
+    output=w[:,0,:]*h[0]
+    m,f,k=w.shape
+    for i in range(1,f):
+        output+=w[:,i,:]*h[i]
     return sig(output)
 
 def probProduct(v, p):
