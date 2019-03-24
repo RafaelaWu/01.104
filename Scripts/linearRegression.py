@@ -32,9 +32,11 @@ c = getc(rBar, trStats["ratings"])
 
 # compute the estimator b
 def param(A, c):
+    I = np.identity(trStats["n_movies"] + trStats["n_users"],dtype=None)
     AT = np.transpose(A)
-    ATA = np.matmul(AT,A)
-    inverse = np.linalg.inv(ATA)
+    ATA = np.dot(AT,A)
+    lI = 0.000000000001*I
+    inverse = np.linalg.inv(ATA+lI) 
     ATc = np.matmul(AT,c)
     b = np.matmul(inverse,ATc)
     return b
@@ -64,7 +66,8 @@ def predict(movies, users, rBar, b):
     return p
 
 # Unregularised version (<=> regularised version with l = 0)
-# b = param(A, c)
+#l =0
+#b = param(A, c)
 
 # Regularised version
 l = 1
