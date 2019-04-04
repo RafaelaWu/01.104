@@ -1,6 +1,7 @@
 import numpy as np
 import projectLib as lib
 import copy
+from matplotlib import pyplot as plt 
 
 # shape is movie,user,rating
 training = lib.getTrainingData()
@@ -15,9 +16,10 @@ rBar = np.mean(trStats["ratings"])
 def getA(training):
     A = np.zeros((trStats["n_ratings"], trStats["n_movies"] + trStats["n_users"]))
     for i in range(trStats["n_ratings"]):
-        A[i][training[i][0]] = 1
-        A[i][training[i][1]] = 1
+        A[i][training[i][0]] = 1  #movies
+        A[i][training[i][1]+97] = 1
     return A
+
 
 # we also get c
 def getc(rBar, ratings):
@@ -52,7 +54,9 @@ def param_reg(A, c, l):
     inverse = np.linalg.inv(ATA+lI)    
     ATc = np.matmul(AT,c)
     b = np.matmul(inverse,ATc)
-    return b    
+    return b   
+
+
 
 # from b predict the ratings for the (movies, users) pair
 def predict(movies, users, rBar, b):
@@ -70,9 +74,58 @@ def predict(movies, users, rBar, b):
 #b = param(A, c)
 
 # Regularised version
-l = 1
+l = min_regularization
 b = param_reg(A, c, l)
 
 print ("Linear regression, l = %f" % l)
 print ("RMSE for training %f" % lib.rmse(predict(trStats["movies"], trStats["users"], rBar, b), trStats["ratings"]))
 print ("RMSE for validation %f" % lib.rmse(predict(vlStats["movies"], vlStats["users"], rBar, b), vlStats["ratings"]))
+
+##Qns 1
+predictedRatings = np.array([predict(trStats["movies"], trStats["users"], rBar, b)])
+################################################################################################
+##Output for 300 by 97
+def output(training,b):
+    G = np.zeros((trStats["n_users"], trStats["n_movies"]))
+    for user in range(300):
+        for movie in range(97):
+            rating = rBar + b[movie]+b[user+97]
+            if rating > 5: rating = 5.0
+            if rating < 1: rating = 1.0
+            G[user][movie] = rating
+    return G
+
+
+
+
+min_rmse=10
+min_regularization = 0
+rmselist= []
+#rrange = [0.001, 0.01, 0.1, 0.5, 1, 10]
+rrange = np.linspace(2.52, 2.55, num=30)
+for regularization in rrange:
+    b = param_reg(A, c, regularization)
+    #print "Linear regression, l = %f" % regularization
+    rmse = lib.rmse(predict(vlStats["movies"], vlStats["users"], rBar, b), vlStats["ratings"])
+    rmselist.append(rmse)
+    #print rmse
+    if rmse < min_rmse:
+        min_rmse = rmse
+        min_regularization = regularization
+
+plt.plot(rrange, rmselist,'ro')
+
+#plt.axis([6, 7, 1.069, 1.070])
+
+plt.title("RMSE vs regularisation parameter")
+print ("Minimum: %f,%f" % (min_regularization, min_rmse))
+plt.show()
+
+
+
+output = output(training,b)
+
+
+np.savetxt("Linearregression+v1.csv", output)
+
+
