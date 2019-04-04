@@ -54,7 +54,7 @@ def visibleToHiddenVec(v, w, hid_bias):
     return sig(np.array(output)+hid_bias)
     
 
-def hiddenToVisible(h, w):
+def hiddenToVisible(h, w, vis_bias):
     ### TO IMPLEMENT ###
     # h is a binary vector of size F
     # w is an array of size m x F x 5
@@ -75,7 +75,7 @@ def hiddenToVisible(h, w):
     # print(summation[0,:])
     ret = np.zeros([m, 5])
     for i in range(m):
-        ret[i, :] = softmax(summation[i, :])
+        ret[i, :] = softmax(summation[i, :]+vis_bias[i,:])
     # print(ret[0,:])
     # print()
     return ret
@@ -114,10 +114,10 @@ def getPredictedDistribution(v, w, wq, vis_bias, hid_bias):
     #   - Backpropagate these hidden states to obtain
     #       the distribution over the movie whose associated weights are wq
     # ret is a vector of size 5
-    posHiddenProb = visibleToHiddenVec(v, w)
+    posHiddenProb = visibleToHiddenVec(v, w,hid_bias)
     sampledHidden = sample(posHiddenProb)
     wq = np.array([wq])
-    negData = hiddenToVisible(sampledHidden, wq) # 1 x 5
+    negData = hiddenToVisible(sampledHidden, wq,vis_bias) # 1 x 5
 
     return negData[0,:]
 
@@ -164,13 +164,13 @@ def predictRatingExp(ratingDistribution):
 #         print (result)
     return result
 
-def predictMovieForUser(q, user, W, training, predictType="exp"):
+def predictMovieForUser(q, user, W, training,vis_bias,hid_bias, predictType="exp"):
     # movie is movie idx
     # user is user ID
     # type can be "max" or "exp"
     ratingsForUser = lib.getRatingsForUser(user, training)
     v = getV(ratingsForUser)
-    ratingDistribution = getPredictedDistribution(v, W[ratingsForUser[:, 0], :, :], W[q, :, :])
+    ratingDistribution = getPredictedDistribution(v, W[ratingsForUser[:, 0], :, :], W[q, :, :],vis_bias,hid_bias)
     if predictType == "max":
         return predictRatingMax(ratingDistribution)
     elif predictType == "mean":
@@ -178,12 +178,12 @@ def predictMovieForUser(q, user, W, training, predictType="exp"):
     else:
         return predictRatingExp(ratingDistribution)
 
-def predict(movies, users, W, training, predictType="exp"):
+def predict(movies, users, W, training, vis_bias,hid_bias,predictType="exp"):
     # given a list of movies and users, predict the rating for each (movie, user) pair
     # used to compute RMSE
-    return [predictMovieForUser(movie, user, W, training, predictType=predictType) for (movie, user) in zip(movies, users)]
+    return [predictMovieForUser(movie, user, W, training,vis_bias,hid_bias, predictType=predictType) for (movie, user) in zip(movies, users)]
 
-def predictForUser(user, W, training, predictType="exp"):
+def predictForUser(user, W, training,vis_bias,hid_bias, predictType="exp"):
     ### TO IMPLEMENT
     # given a user ID, predicts all movie ratings for the user
-    return [predictMovieForUser(movie, user, W, training, predictType=predictType) for movie in lib.getUsefulStats(training)["u_movies"]]
+    return [predictMovieForUser(movie, user, W, training,vis_bias,hid_bias, predictType=predictType) for movie in lib.getUsefulStats(training)["u_movies"]]
