@@ -114,12 +114,12 @@ def getPredictedDistribution(v, w, wq, vis_bias, hid_bias):
     #   - Backpropagate these hidden states to obtain
     #       the distribution over the movie whose associated weights are wq
     # ret is a vector of size 5
-    m,f,K=w.shape
-    p_learn = visibleToHiddenVec(v,w,hid_bias)
-    PG = probProduct(v, p_learn)
-    hidden_activations = sample(p_learn)
-    v_negative = hiddenToVisible(hidden_activations, wq.reshape(1,wq.shape[0],wq.shape[1]))
-    return v_negative.reshape(5)
+    posHiddenProb = visibleToHiddenVec(v, w)
+    sampledHidden = sample(posHiddenProb)
+    wq = np.array([wq])
+    negData = hiddenToVisible(sampledHidden, wq) # 1 x 5
+
+    return negData[0,:]
 
 def predictRatingMax(ratingDistribution):
     ### TO IMPLEMENT ###
@@ -128,7 +128,12 @@ def predictRatingMax(ratingDistribution):
     # This function is one of three you are to implement
     # that returns a rating from the distribution
     # We decide here that the predicted rating will be the one with the highest probability
-    return None
+    max_indices = np.where(ratingDistribution == np.amax(ratingDistribution))[0]
+    if max_indices.shape[0] == 1:
+        result = max_indices.item()
+    else:
+        result = 2
+    return result+1
 
 def predictRatingMean(ratingDistribution):
     ### TO IMPLEMENT ###
@@ -137,7 +142,11 @@ def predictRatingMean(ratingDistribution):
     # This function is one of three you are to implement
     # that returns a rating from the distribution
     # We decide here that the predicted rating will be the expectation over ratingDistribution
-    return None
+    normalized = [i/sum(ratingDistribution) for i in ratingDistribution]
+    result = 0 
+    for k in range(ratingDistribution.shape[0]):
+        result += normalized[k]*(k+1)
+    return result
 
 def predictRatingExp(ratingDistribution):
     ### TO IMPLEMENT ###
@@ -147,7 +156,13 @@ def predictRatingExp(ratingDistribution):
     # that returns a rating from the distribution
     # We decide here that the predicted rating will be the expectation over
     # the softmax applied to ratingDistribution
-    return None
+    softmax = np.exp(ratingDistribution)/sum(np.exp(ratingDistribution))
+#     print(softmax)
+    result = 0 
+    for k in range(len(ratingDistribution)):
+        result += softmax[k]*(k+1)
+#         print (result)
+    return result
 
 def predictMovieForUser(q, user, W, training, predictType="exp"):
     # movie is movie idx
@@ -171,4 +186,4 @@ def predict(movies, users, W, training, predictType="exp"):
 def predictForUser(user, W, training, predictType="exp"):
     ### TO IMPLEMENT
     # given a user ID, predicts all movie ratings for the user
-    return None
+    return [predictMovieForUser(movie, user, W, training, predictType=predictType) for movie in lib.getUsefulStats(training)["u_movies"]]
