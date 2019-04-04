@@ -181,7 +181,7 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
     else:
         print('Final training loss = %f' % trRMSE)
         print('Final validation loss = %f' % vlRMSE)
-    return [best_validation_loss, best_validation_predictions]
+    return [best_validation_loss, best_validation_predictions, best_validation_weights]
 
 #Hyperparameter tuning:
 
@@ -226,5 +226,14 @@ _lambda = 0.1 #tuned
 gradientLearningRate = 0.001 #tuned
 minibatch_size = 10
 F = 8 
+
+W = main_rbm(training=training, validation=validation, trStats=trStats, vlStats=vlStats, 
+             K=5, F=8, epochs=30, gradientLearningRate=0.001, gradientLearningRate_v = 0.001,
+             gradientLearningRate_h = 0.001, minibatch_size=10, alpha=0.9, 
+             stopping=True, momentum=True, learning_rate_type='time', learning_rate_k=0.5, 
+             learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = 0.1)[2]
+
+predictedRatings = np.array([rbm_sy.predictForUser(user, W, training) for user in trStats["u_users"]])
+np.savetxt("SpateggiChikenChoope+v2.txt", predictedRatings)
 
 # TODO: Tune other parameters and add biases
