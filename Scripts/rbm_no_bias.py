@@ -37,24 +37,21 @@ def sig(x):
     # ret should be a vector of size n where ret_i = sigmoid(x_i)
     return 1/(1+np.exp(-x))
 
-def visibleToHiddenVec(v, w, hid_bias):
+def visibleToHiddenVec(v, w):
     ### TO IMPLEMENT ###
     # v is a matrix of size m x 5. Each row is a binary vector representing a rating
     #    OR a probability distribution over the rating
     # w is a list of matrices of size m x F x 5
     # ret should be a vector of size F
-    m,f,K=w.shape
-    output=list()
-    for i in range(f):
-        summ=0
+    m = v.shape[0]
+    F = w.shape[1]
+    ret = np.zeros(F)
+    for i in range(m):
         for k in range(K):
-            for j in range(m):
-                summ+=v[j,k]*w[j,i,k]
-        output.append(summ)
-    return sig(np.array(output)+hid_bias)
-    
+            ret += v[i,k]*w[i,:,k]
+    return sig(ret)
 
-def hiddenToVisible(h, w, vis_bias):
+def hiddenToVisible(h, w):
     ### TO IMPLEMENT ###
     # h is a binary vector of size F
     # w is an array of size m x F x 5
@@ -64,20 +61,11 @@ def hiddenToVisible(h, w, vis_bias):
     #   has not rated! (where reconstructing means getting a distribution
     #   over possible ratings).
     #   We only do so when we predict the rating a user would have given to a movie.
-    # output=w[:,0,:]*h[0]
-    # m,f,k=w.shape
-    # for i in range(1,f):
-    #     output+=w[:,i,:]*h[i]
-    # return sig(output+vis_bias)
     m = w.shape[0]
     summation = np.tensordot(h, w, axes=([0],[1]))
-    # print(summation.shape) # (m,5)
-    # print(summation[0,:])
     ret = np.zeros([m, 5])
     for i in range(m):
-        ret[i, :] = softmax(summation[i, :]+vis_bias[i,:])
-    # print(ret[0,:])
-    # print()
+        ret[i, :] = softmax(summation[i, :])
     return ret
 
 def probProduct(v, p):
@@ -88,7 +76,7 @@ def probProduct(v, p):
     for i in range(v.shape[0]):
         for j in range(p.size):
             for k in range(v.shape[1]):
-                ret[i, j, k] = v[i, k] * p[j]
+                ret[i,j,k]=v[i,k]*p[j]
     return ret
 
 def sample(p):
@@ -97,9 +85,10 @@ def sample(p):
     # In other word we sample from a Bernouilli distribution with
     # parameter p_i to obtain ret_i
     samples = np.random.random(p.size)
+    # print(samples)
     return np.array(samples <= p, dtype=int)
 
-def getPredictedDistribution(v, w, wq, vis_bias, hid_bias):
+def getPredictedDistribution(v, w, wq):
     ### TO IMPLEMENT ###
     # This function returns a distribution over the ratings for movie q, if user data is v
     # v is the dataset of the user we are predicting the movie for
@@ -114,10 +103,14 @@ def getPredictedDistribution(v, w, wq, vis_bias, hid_bias):
     #   - Backpropagate these hidden states to obtain
     #       the distribution over the movie whose associated weights are wq
     # ret is a vector of size 5
-    posHiddenProb = visibleToHiddenVec(v, w,hid_bias)
+    posHiddenProb = visibleToHiddenVec(v, w)
+
+    ### UNLEARNING ###
+    # sample from hidden distribution
     sampledHidden = sample(posHiddenProb)
+    # propagate back to get "negative data"
     wq = np.array([wq])
-    negData = hiddenToVisible(sampledHidden, wq,vis_bias)
+    negData = hiddenToVisible(sampledHidden, wq)
 
     return negData[0,:]
 
@@ -125,65 +118,42 @@ def predictRatingMax(ratingDistribution):
     ### TO IMPLEMENT ###
     # ratingDistribution is a probability distribution over possible ratings
     #   It is obtained from the getPredictedDistribution function
-    # This function is one of three you are to implement
+    # This function is one of two you are to implement
     # that returns a rating from the distribution
     # We decide here that the predicted rating will be the one with the highest probability
-    max_indices = np.where(ratingDistribution == np.amax(ratingDistribution))[0]
-    if max_indices.shape[0] == 1:
-        result = max_indices.item()
-    else:
-        result = 2
-    return result+1
 
-def predictRatingMean(ratingDistribution):
-    ### TO IMPLEMENT ###
-    # ratingDistribution is a probability distribution over possible ratings
-    #   It is obtained from the getPredictedDistribution function
-    # This function is one of three you are to implement
-    # that returns a rating from the distribution
-    # We decide here that the predicted rating will be the expectation over ratingDistribution
-    normalized = [i/sum(ratingDistribution) for i in ratingDistribution]
-    result = 0 
-    for k in range(ratingDistribution.shape[0]):
-        result += normalized[k]*(k+1)
-    return result
+    return ratingDistribution.index(max(ratingDistribution))+1
 
 def predictRatingExp(ratingDistribution):
     ### TO IMPLEMENT ###
     # ratingDistribution is a probability distribution over possible ratings
     #   It is obtained from the getPredictedDistribution function
-    # This function is one of three you are to implement
+    # This function is one of two you are to implement
     # that returns a rating from the distribution
-    # We decide here that the predicted rating will be the expectation over
-    # the softmax applied to ratingDistribution
-    softmax = np.exp(ratingDistribution)/sum(np.exp(ratingDistribution))
-#     print(softmax)
-    result = 0 
-    for k in range(len(ratingDistribution)):
-        result += softmax[k]*(k+1)
-#         print (result)
-    return result
+    # We decide here that the predicted rating will be the expectation of the ratingDistribution
+    ret = 0
+    for i in range(K):
+        ret += (i+1) * ratingDistribution[i]
+    return ret
 
-def predictMovieForUser(q, user, W, training,vis_bias,hid_bias, predictType="exp"):
+def predictMovieForUser(q, user, W, training, predictType="exp"):
     # movie is movie idx
     # user is user ID
     # type can be "max" or "exp"
     ratingsForUser = lib.getRatingsForUser(user, training)
     v = getV(ratingsForUser)
-    ratingDistribution = getPredictedDistribution(v, W[ratingsForUser[:, 0], :, :], W[q, :, :],vis_bias,hid_bias)
+    ratingDistribution = getPredictedDistribution(v, W[ratingsForUser[:, 0], :, :], W[q, :, :])
     if predictType == "max":
         return predictRatingMax(ratingDistribution)
-    elif predictType == "mean":
-        return predictRatingMean(ratingDistribution)
     else:
         return predictRatingExp(ratingDistribution)
 
-def predict(movies, users, W, training, vis_bias,hid_bias,predictType="exp"):
+def predict(movies, users, W, training, predictType="exp"):
     # given a list of movies and users, predict the rating for each (movie, user) pair
     # used to compute RMSE
-    return [predictMovieForUser(movie, user, W, training,vis_bias,hid_bias, predictType=predictType) for (movie, user) in zip(movies, users)]
+    return [predictMovieForUser(movie, user, W, training, predictType=predictType) for (movie, user) in zip(movies, users)]
 
-def predictForUser(user, W, training,vis_bias,hid_bias, predictType="exp"):
+def predictForUser(user, W, training, predictType="exp"):
     ### TO IMPLEMENT
     # given a user ID, predicts all movie ratings for the user
-    return [predictMovieForUser(movie, user, W, training,vis_bias,hid_bias, predictType=predictType) for movie in lib.getUsefulStats(training)["u_movies"]]
+    return [predictMovieForUser(movie, user, W, training, predictType=predictType) for movie in lib.getUsefulStats(training)["u_movies"]]
