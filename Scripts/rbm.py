@@ -64,11 +64,11 @@ def hiddenToVisible(h, w, vis_bias):
     #   has not rated! (where reconstructing means getting a distribution
     #   over possible ratings).
     #   We only do so when we predict the rating a user would have given to a movie.
-    # output=w[:,0,:]*h[0]
-    # m,f,k=w.shape
-    # for i in range(1,f):
-    #     output+=w[:,i,:]*h[i]
-    # return sig(output+vis_bias)
+#     output=w[:,0,:]*h[0]
+#     m,f,k=w.shape
+#     for i in range(1,f):
+#         output+=w[:,i,:]*h[i]
+#     return sig(output+vis_bias)
     m = w.shape[0]
     summation = np.tensordot(h, w, axes=([0],[1]))
     # print(summation.shape) # (m,5)
