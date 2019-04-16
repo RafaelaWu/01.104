@@ -114,10 +114,10 @@ def getPredictedDistribution(v, w, wq, vis_bias, hid_bias):
     #   - Backpropagate these hidden states to obtain
     #       the distribution over the movie whose associated weights are wq
     # ret is a vector of size 5
-    posHiddenProb = visibleToHiddenVec(v, w,hid_bias)
+    posHiddenProb = visibleToHiddenVec(v, w, hid_bias)
     sampledHidden = sample(posHiddenProb)
     wq = np.array([wq])
-    negData = hiddenToVisible(sampledHidden, wq,vis_bias)
+    negData = hiddenToVisible(sampledHidden, wq, vis_bias)
 
     return negData[0,:]
 

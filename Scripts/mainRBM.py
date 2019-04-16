@@ -46,8 +46,8 @@ def batch_get(array, B):
     return ret
 
 def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=vlStats, 
-             K=5, F=5, epochs=30, gradientLearningRate=0.0001,gradientLearningRate_v = 0.001,
-             gradientLearningRate_h = 0.001, minibatch_size=10, alpha=0.9, 
+             K=5, F=5, epochs=30, gradientLearningRate=0.0001,gradientLearningRate_v = 0.0001,
+             gradientLearningRate_h = 0.0001, minibatch_size=10, alpha=0.9, 
              stopping=False, momentum=False, learning_rate_type='time', learning_rate_k=0.1, 
              learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = 0.3):
     
@@ -168,6 +168,8 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
             best_validation_loss = vlRMSE
             best_validation_weights = W
             best_validation_predictions = vl_r_hat
+            best_vis_bias = vis_bias
+            best_hid_bias = hid_bias
 #             best_momentum = momentum
 #             best_reg = regularization
 #             best_epoch = epoch
@@ -204,17 +206,17 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
     else:
         print('Final training loss = %f' % trRMSE)
         print('Final validation loss = %f' % vlRMSE)
-    return [best_validation_loss, best_validation_predictions, best_validation_weights]
+    return [best_validation_loss, best_validation_predictions, best_validation_weights, best_vis_bias, best_vis_bias]
 
 #Hyperparameter tuning:
 
 # mrange = np.linspace(0.7,0.95,5)
-mrange = [0.5, 0.7, 0.8, 0.9, 0.95]
+mrange = [0.7, 0.8, 0.9]
 # rrange = np.linspace(0.1,0.9,5)
-rrange = [0.001, 0.01, 0.1, 0.5, 1]
-arange = [0.0001, 0.001, 0.005, 0.01, 0.1]
-brange = [5, 10, 15, 20, 50]
-frange = [5, 8, 10, 15, 20]
+rrange = [0.1, 0.5, 0.9]
+arange = [0.0001, 0.001, 0.01]
+brange = [10]
+frange = [5, 10, 20]
 
 best_momentum = 0
 best_reg = 0
@@ -223,14 +225,15 @@ best_batch = 0
 best_F = 0
 
 min_rmse=10
+count = 0
 for momentum in mrange:
     for regularization in rrange:
         for learning_rate in arange:
             for batch in brange:
                 for F in frange:
                     prediction = main_rbm(training=training, validation=validation, trStats=trStats, vlStats=vlStats, 
-                                 K=5, F=int(F), epochs=30, gradientLearningRate=learning_rate, gradientLearningRate_v = 0.001,
-                                 gradientLearningRate_h = 0.001, minibatch_size=int(batch), alpha=momentum, 
+                                 K=5, F=int(F), epochs=30, gradientLearningRate=learning_rate, gradientLearningRate_v = 0.0001/int(batch),
+                                 gradientLearningRate_h = 0.0001/int(batch), minibatch_size=int(batch), alpha=momentum, 
                                  stopping=True, momentum=True, learning_rate_type='time', learning_rate_k=0.5, 
                                  learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = regularization)
                     if prediction[0] < min_rmse:
@@ -242,6 +245,19 @@ for momentum in mrange:
                         best_F = F
                         best_predict = prediction[1]
                         min_rmse = prediction[0]
+                    count += 1
+                    if count%10 == 0: 
+						W = main_rbm(training=training, validation=validation, trStats=trStats, vlStats=vlStats, 
+						             K=5, F=best_F, epochs=30, gradientLearningRate=best_lr, gradientLearningRate_v = 0.0001/best_batch,
+						             gradientLearningRate_h = 0.0001/best_batch, minibatch_size=best_batch, alpha=best_momentum, 
+						             stopping=True, momentum=True, learning_rate_type='time', learning_rate_k=0.5, 
+						             learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = best_reg)
+
+						vis = W[3]
+						hid = W[4]
+
+						predictedRatings = np.array([rbm.predictForUser(user, W[2], training,vis,hid) for user in trStats["u_users"]])
+						np.savetxt("output_iteration_%d.txt" % count, predictedRatings)
 
 ## Final parameters:
 alpha = 0.9
@@ -251,12 +267,14 @@ minibatch_size = 10
 F = 8 
 
 W = main_rbm(training=training, validation=validation, trStats=trStats, vlStats=vlStats, 
-             K=5, F=best_F, epochs=30, gradientLearningRate=best_lr, gradientLearningRate_v = 0.001,
-             gradientLearningRate_h = 0.001, minibatch_size=best_batch, alpha=best_momentum, 
-             stopping=True, momentum=True, learning_rate_type='time', learning_rate_k=best_lr/30, 
-             learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = best_reg)[2]
+	             K=5, F=best_F, epochs=30, gradientLearningRate=best_lr, gradientLearningRate_v = 0.0001/best_batch,
+	             gradientLearningRate_h = 0.0001/best_batch, minibatch_size=best_batch, alpha=best_momentum, 
+	             stopping=True, momentum=True, learning_rate_type='time', learning_rate_k=0.5, 
+	             learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = best_reg)
 
-predictedRatings = np.array([rbm.predictForUser(user, W, training) for user in trStats["u_users"]])
-np.savetxt("SpateggiChikenChoope+v2.txt", predictedRatings)
+vis = W[3]
+hid = W[4]
 
+predictedRatings = np.array([rbm.predictForUser(user, W[2], training,vis,hid) for user in trStats["u_users"]])
+np.savetxt("output_final.txt", predictedRatings)
 # TODO: Tune other parameters and add biases
