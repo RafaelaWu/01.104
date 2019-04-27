@@ -1,6 +1,7 @@
 import numpy as np
 import rbm
 import projectLib as lib
+import matplotlib.pyplot as plt
 
 training = lib.getTrainingData()
 validation = lib.getValidationData()
@@ -23,31 +24,9 @@ gradientLearningRate_h = 0.001
 _lambda = 1
 minibatch_size = 10
 
-def adaptiveLearn(learning_rate_type=['constant','adapt','time', 'step', 'exponential'], 
-                  lr=0.0001, k=0.1, epoch=None, drop=0.5, epochs_drop=10.0):
-#time-based decay, step decay and exponential decay
-    if learning_rate_type == 'constant':
-        return lr
-    elif learning_rate_type == 'adapt':
-        return lr/(epoch**2)
-    elif learning_rate_type == 'time':
-        return lr/(1.0+k*epoch)
-    elif learning_rate_type == 'step':
-        return lr*np.power(drop,np.floor((1+epoch)/epochs_drop))
-    elif learning_rate_type == 'exponential':
-        return lr*np.exp(-k*epoch)
-    
-def batch_get(array, B):
-    ret = []
-    for i in range(int(len(array)/B)):
-        ret.append(array[i*B:i*B+B])
-    if len(array)%B != 0:
-        ret.append(array[len(array)/B:])
-    return ret
-
 def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=vlStats, 
-             K=5, F=5, epochs=30, gradientLearningRate=0.0001,gradientLearningRate_v = 0.0001,
-             gradientLearningRate_h = 0.0001, minibatch_size=10, alpha=0.9, 
+             K=5, F=5, epochs=30, gradientLearningRate=0.0001,gradientLearningRate_v = 0.001,
+             gradientLearningRate_h = 0.001, minibatch_size=10, alpha=0.9, 
              stopping=False, momentum=False, learning_rate_type='time', learning_rate_k=0.1, 
              learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = 0.3):
     
@@ -74,7 +53,7 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
     m_h=np.zeros((F,))
     best_train_loss = 100
     best_validation_loss = 100
-
+    
     for epoch in range(1, epochs+1):
     #     mini_batch_grads = []
         # in each epoch, we'll visit all users in a random order
@@ -86,7 +65,6 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
 #                 y_train_mini = y_train[i:i + minibatch_size]
 #         for i in range(0, visitingOrder.shape[0], minibatch_size):
         batches = batch_get(visitingOrder, minibatch_size)
-        poshidact,posvisact,neghidact,negvisact = 0,0,0,0
         for batch in batches:
             prev_grad = grad_w
             grad_w = np.zeros(W.shape)
@@ -102,26 +80,26 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
 
                 ### LEARNING ###
                 # propagate visible input to hidden units
-                posHiddenProb = rbm.visibleToHiddenVec(v, weightsForUser,hid_bias) #, hid_bias)
+                posHiddenProb = rbm.visibleToHiddenVec(v, weightsForUser) #, hid_bias)
                 # get positive gradient
                 # note that we only update the movies that this user has seen!
-                posprods[ratingsForUser[:, 0], :, :] += rbm.probProduct(v, posHiddenProb)
+                posprods[ratingsForUser[:, 0], :, :] += probProduct(v, posHiddenProb)
 
                 ### UNLEARNING ###
                 # sample from hidden distribution
                 sampledHidden = rbm.sample(posHiddenProb)
                 # propagate back to get "negative data"
-                negData = rbm.hiddenToVisible(sampledHidden, weightsForUser,vis_bias[ratingsForUser[:,0]])#, vis_bias[ratingsForUser[:,0]])
+                negData = rbm.hiddenToVisible(sampledHidden, weightsForUser)#, vis_bias[ratingsForUser[:,0]])
                 # propagate negative data to hidden units
-                negHiddenProb = rbm.visibleToHiddenVec(negData, weightsForUser,hid_bias) #, hid_bias)
+                negHiddenProb = rbm.visibleToHiddenVec(negData, weightsForUser) #, hid_bias)
                 # get negative gradient
                 # note that we only update the movies that this user has seen!
                 negprods[ratingsForUser[:, 0], :, :] += rbm.probProduct(negData, negHiddenProb)
 
-                poshidact += sum(posHiddenProb)
-                posvisact += sum(v)
-                neghidact += sum(negHiddenProb)
-                negvisact += sum(negData)
+                poshidact = sum(posHiddenProb)
+                posvisact = sum(v)
+                neghidact = sum(negHiddenProb)
+                negvisact = sum(negData)
                 # we average over the number of users in the batch (if we use mini-batch)
     #             grad = (gradientLearningRate/epoch)*(posprods-negprods)
                 '''
@@ -137,8 +115,8 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
                 Ask about the implementation of biases (should we create matrix of biases for hidden and visible layers?)
                 '''
             m_w = alpha*m_w + grad_w
-            m_v = alpha*m_v+(gradientLearningRate_v) * (posvisact - negvisact)
-            m_h = alpha*m_h+(gradientLearningRate_h) * (poshidact - neghidact)
+#             m_v = alpha*m_v+(gradientLearningRate_v) * (posvisact - negvisact)
+#             m_h = alpha*m_h+(gradientLearningRate_h) * (poshidact - neghidact)
 
             if momentum == False:
                 W += grad_w
@@ -151,7 +129,7 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
         # Print the current RMSE for training and validation sets
         # this allows you to control for overfitting e.g
         # We predict over the training set
-        tr_r_hat = rbm.predict(trStats["movies"], trStats["users"], W, training,vis_bias,hid_bias) #, vis_bias, hid_bias, predictType='exp')
+        tr_r_hat = rbm.predict(trStats["movies"], trStats["users"], W, training) #, vis_bias, hid_bias, predictType='exp')
     #     print (tr_r_hat)
         trRMSE = lib.rmse(trStats["ratings"], tr_r_hat)
     #     print (trRMSE)
@@ -161,15 +139,13 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
             best_train_predictions = tr_r_hat
 
         # We predict over the validation set
-        vl_r_hat = rbm.predict(vlStats["movies"], vlStats["users"], W, training,vis_bias,hid_bias) #, vis_bias, hid_bias, predictType='exp')
+        vl_r_hat = rbm.predict(vlStats["movies"], vlStats["users"], W, training) #, vis_bias, hid_bias, predictType='exp')
     #     vl_r_hat
         vlRMSE = lib.rmse(vlStats["ratings"], vl_r_hat)
         if vlRMSE < best_validation_loss:
             best_validation_loss = vlRMSE
             best_validation_weights = W
             best_validation_predictions = vl_r_hat
-            best_vis_bias = vis_bias
-            best_hid_bias = hid_bias
 #             best_momentum = momentum
 #             best_reg = regularization
 #             best_epoch = epoch
@@ -206,58 +182,44 @@ def main_rbm(training=training, validation=validation, trStats=trStats, vlStats=
     else:
         print('Final training loss = %f' % trRMSE)
         print('Final validation loss = %f' % vlRMSE)
-    return [best_validation_loss, best_validation_predictions, best_validation_weights, best_vis_bias, best_vis_bias]
+    return [best_validation_loss, best_validation_predictions]
 
 #Hyperparameter tuning:
 
 # mrange = np.linspace(0.7,0.95,5)
-mrange = [0.7, 0.8, 0.9]
+mrange = [0.9]
 # rrange = np.linspace(0.1,0.9,5)
-rrange = [0.1, 0.5, 0.9]
-arange = [0.0001, 0.001, 0.01]
+rrange = [0.001, 0.01, 0.1, 0.5, 1]
+arange = [0.0001, 0.001, 0.01, 0.1]
 brange = [10]
-frange = [5, 10, 20]
+frange = [8]
 
 best_momentum = 0
 best_reg = 0
-best_lr = 0
+best_alpha = 0
 best_batch = 0
 best_F = 0
 
 min_rmse=10
-count = 0
 for momentum in mrange:
     for regularization in rrange:
         for learning_rate in arange:
             for batch in brange:
                 for F in frange:
                     prediction = main_rbm(training=training, validation=validation, trStats=trStats, vlStats=vlStats, 
-                                 K=5, F=int(F), epochs=30, gradientLearningRate=learning_rate, gradientLearningRate_v = 0.0001/int(batch),
-                                 gradientLearningRate_h = 0.0001/int(batch), minibatch_size=int(batch), alpha=momentum, 
+                                 K=5, F=int(F), epochs=30, gradientLearningRate=learning_rate, gradientLearningRate_v = 0.001,
+                                 gradientLearningRate_h = 0.001, minibatch_size=int(batch), alpha=momentum, 
                                  stopping=True, momentum=True, learning_rate_type='time', learning_rate_k=0.5, 
                                  learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = regularization)
                     if prediction[0] < min_rmse:
                         best_momentum = momentum
                         best_reg = regularization
 #                             best_epoch = epoch
-                        best_lr = learning_rate
+                        best_alpha = learning_rate
                         best_batch = batch
                         best_F = F
                         best_predict = prediction[1]
                         min_rmse = prediction[0]
-                    count += 1
-                    if count%10 == 0: 
-						W = main_rbm(training=training, validation=validation, trStats=trStats, vlStats=vlStats, 
-						             K=5, F=best_F, epochs=30, gradientLearningRate=best_lr, gradientLearningRate_v = 0.0001/best_batch,
-						             gradientLearningRate_h = 0.0001/best_batch, minibatch_size=best_batch, alpha=best_momentum, 
-						             stopping=True, momentum=True, learning_rate_type='time', learning_rate_k=0.5, 
-						             learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = best_reg)
-
-						vis = W[3]
-						hid = W[4]
-
-						predictedRatings = np.array([rbm.predictForUser(user, W[2], training,vis,hid) for user in trStats["u_users"]])
-						np.savetxt("output_iteration_%d.txt" % count, predictedRatings)
 
 ## Final parameters:
 alpha = 0.9
@@ -266,15 +228,4 @@ gradientLearningRate = 0.001 #tuned
 minibatch_size = 10
 F = 8 
 
-W = main_rbm(training=training, validation=validation, trStats=trStats, vlStats=vlStats, 
-	             K=5, F=best_F, epochs=30, gradientLearningRate=best_lr, gradientLearningRate_v = 0.0001/best_batch,
-	             gradientLearningRate_h = 0.0001/best_batch, minibatch_size=best_batch, alpha=best_momentum, 
-	             stopping=True, momentum=True, learning_rate_type='time', learning_rate_k=0.5, 
-	             learning_rate_drop=0.5, learning_rate_epochs_drop=10.0, _lambda = best_reg)
-
-vis = W[3]
-hid = W[4]
-
-predictedRatings = np.array([rbm.predictForUser(user, W[2], training,vis,hid) for user in trStats["u_users"]])
-np.savetxt("output_final.txt", predictedRatings)
 # TODO: Tune other parameters and add biases
