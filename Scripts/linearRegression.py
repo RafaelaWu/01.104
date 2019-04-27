@@ -144,6 +144,6 @@ def output(training,b):
             G[user][movie] = rating
     return G
 output = output(training,b)
-#np.savetxt("Linearregression+v1.csv", output)
+np.savetxt("Linearregression+v2.txt", output)
 
 
